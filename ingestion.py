@@ -1,4 +1,5 @@
 import asyncio
+import re
 import ssl
 import os
 from dotenv import load_dotenv
@@ -21,6 +22,41 @@ from logger import (Colors, log_error, log_header, log_info, log_success,
                     log_warning)
 
 
+semaphore = asyncio.Semaphore(2)  #to avoid rate limits
+MAIN_URL="https://darksouls.fandom.com/wiki/Lore"
+
+"""URL Filtering"""
+BAD_URLS = [
+    "https://auth.fandom.com/"
+    "auth.fandom.com/",
+    "veaction=edit",
+    "action=edit",
+    "section=",
+    "oldid=",
+    "diff=",
+    "curid=",
+    "replyId=",
+    "commentId=",
+    "/f/p/",  # forum/discussion style pages if you don't want them
+    "/wiki/Special:",
+    "/wiki/File:",
+    "/wiki/Category:",
+    "/wiki/Template:",
+    "/wiki/Help:",
+    "/wiki/User:",
+    "/wiki/User_blog:",
+    "/wiki/Message_Wall:",
+    r"/Gallery",
+    r"/Images",
+]
+
+GOOD_URLS = [
+    "https://darksouls.fandom.com/wiki/"
+]
+
+
+
+
 
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -29,12 +65,14 @@ os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 embeddings = GoogleGenerativeAIEmbeddings(
     model="gemini-embedding-001",
     task_type="RETRIEVAL_DOCUMENT",
-    output_dimensionality=1536
+    output_dimensionality=1536,
+
 )
 
 vector_store=PineconeVectorStore(index_name="document-assistant", embedding=embeddings)
+vector_store.delete(delete_all=True, namespace="__default__") #to reset VectorStore
 tavily_extract = TavilyExtract()
-tavily_map = TavilyMap(max_depth=2, max_breadth=30, max_pages=1000)
+tavily_map = TavilyMap(max_depth=2, max_breadth=60, max_pages=1000)
 tavily_crawl = TavilyCrawl()
 
 
@@ -57,19 +95,61 @@ async def extract_batch(urls: List[str], batch_num : int) -> List[Dict[str, Any]
             Colors.BLUE,
         )
         #multiple batches can run concurrently
-        site_extract=await tavily_extract.ainvoke(input={"urls": urls, "extract_depth": "advanced"}) #async invoke
+        site_extract=await tavily_extract.ainvoke(input={"urls": urls, "extract_depth": "basic",
+                                                                            }) #async invoke
         extract_count=len(site_extract.get("results",[]))
-        #some urls may not get extracted because theey may not have any content, blocked or timeout etc
+        #some urls may not get extracted because they may not have any content, blocked or timeout etc
 
-        if extract_count>0:
-            log_success(f"TavilyExtract: Extracted {extract_count} documents from batch {batch_num}.")
+        # Normalize weird wrapper responses
+        if isinstance(site_extract, dict):
+            results = site_extract.get("results", [])
+            if not isinstance(results, list):
+                log_error(
+                    f"TavilyExtract: Batch {batch_num} returned dict but results was not a list: {site_extract}"
+                )
+                return {"results": []}
+
+            if results:
+                log_success(
+                    f"TavilyExtract: Extracted {len(results)} URLs from batch {batch_num}."
+                )
+            else:
+                log_error(
+                    f"TavilyExtract: Extraction failed in batch {batch_num}. Response: {site_extract}"
+                )
+            return {"results": results}
+
+        # Sometimes wrappers return a list directly
+        elif isinstance(site_extract, list):
+            log_warning(
+                f"TavilyExtract: Batch {batch_num} returned a list instead of dict. Normalizing response."
+            )
+            if site_extract:
+                log_success(
+                    f"TavilyExtract: Extracted {len(site_extract)} documents from batch {batch_num}."
+                )
+            else:
+                log_error(
+                    f"TavilyExtract: Extraction failed in batch {batch_num}. Empty list returned."
+                )
+            return {"results": site_extract}
+
+        # Sometimes wrappers return a string / error message
+        elif isinstance(site_extract, str):
+            log_error(
+                f"TavilyExtract: Batch {batch_num} returned a string instead of dict: {site_extract}"
+            )
+            return {"results": []}
+
         else:
-            log_error(f"TavilyExtract: Extraction failed in batch {batch_num}.")
-            #no url extracted in a batch
-        return site_extract
+            log_error(
+                f"TavilyExtract: Batch {batch_num} returned unexpected type {type(site_extract).__name__}: {site_extract}"
+            )
+            return {"results": []}
+
     except Exception as e:
         log_error(f"TavilyExtract: Failed to extract batch {batch_num} - {e}")
-        return []
+        return {"results": []}
 #output-> dict output of every url in the batch as a list: [20 dicts]
 
 
@@ -86,13 +166,25 @@ async def async_extract(url_batches: List[List[str]]):
     # travers url by url and convert it to document and append to one list
     all_pages=[]
     failed_batches = 0
-    for result in results:  #batch by batch
-        if isinstance(result,Exception):
+    for result in results:
+        if isinstance(result, Exception):
             log_error(f"TavilyExtract: Batch failed with exception - {result}")
             failed_batches += 1
-        else:
-            for extracted_page in result["results"]:   #url by url in a batch
-                document=Document(page_content=extracted_page["raw_content"], metadata={"url": extracted_page["url"]})
+            continue
+
+        for extracted_page in result.get("results", []):
+            if not isinstance(extracted_page, dict):
+                log_warning(f"TavilyExtract: Skipping malformed extracted page: {extracted_page}")
+                continue
+
+            raw_content = extracted_page.get("raw_content", "")
+            url = extracted_page.get("url", "unknown")
+
+            if raw_content:
+                document = Document(
+                    page_content=raw_content,
+                    metadata={"url": url}
+                )
                 all_pages.append(document)
 
     log_success(
@@ -100,6 +192,7 @@ async def async_extract(url_batches: List[List[str]]):
     )
     if failed_batches > 0:
         log_warning(f"TavilyExtract: {failed_batches} batches failed during extraction")
+
     return all_pages
 
 
@@ -117,25 +210,48 @@ async def batch_indexing(documents : List[Document], batch_size: int = 50):
         f"VectorIndexing: Split into {len(docs_batches)} batches of {batch_size} documents each"
     )
 
+    """Only use this if Embeddings Model support Input Chunk Limitters(Like OpenAI). Otherwise it will cause rate limit exceeded errors"""
     #another async routine to process each batch
-    async def add_batch(batch: List[Document], batch_num: int):
+    # async def add_batch(batch: List[Document], batch_num: int):
+    #
+    #         try:
+    #             await vector_store.aadd_documents(batch)  #async add
+    #             log_success(f"VectorStore: Successfully added batch {batch_num} with {len(batch)} documents to Vector Store")
+    #
+    #         except Exception as e:
+    #             log_error(f"VectorStore: Failed to add batch {batch_num} - {e}")
+    #             return False
+    #         return True
+    #
+    # task=[add_batch(b,i+1) for i, b in enumerate(docs_batches)]
+    # results=await asyncio.gather(*task, return_exceptions=True)
+    #
+    # # Count successful batches
+    # successful= sum([1 for i in results if i==True])
+    #
+    # if successful==len(docs_batches):
+    #     log_success(f"VectorStore: Successfully index all {len(docs_batches)} batches.")
+    # else:
+    #     log_warning(f"VectorStore: Processed {successful}/{len(docs_batches)} batches")
+
+    """Gemini Implementation:"""
+
+    successful = 0
+    for i, batch in enumerate(docs_batches, start=1):
         try:
-            await vector_store.aadd_documents(batch)  #async add
-            log_success(f"VectorStore: Successfully added batch {batch_num} with {len(batch)} documents to Vector Store")
+            vector_store.add_documents(batch)
+            log_success(
+                f"VectorStore: Successfully added batch {i} with {len(batch)} documents to Vector Store"
+            )
+            successful += 1
+
+            await asyncio.sleep(1)
 
         except Exception as e:
-            log_error(f"VectorStore: Failed to add batch {batch_num} - {e}")
-            return False
-        return True
+            log_error(f"VectorStore: Failed to add batch {i} - {e}")
 
-    task=[add_batch(b,i+1) for i, b in enumerate(docs_batches)]
-    results=await asyncio.gather(*task, return_exceptions=True)
-
-    # Count successful batches
-    successful= sum([1 for i in results if i==True])
-
-    if successful==len(docs_batches):
-        log_success(f"VectorStore: Successfully index all {len(docs_batches)} batches.")
+    if successful == len(docs_batches):
+        log_success(f"VectorStore: Successfully indexed all {len(docs_batches)} batches.")
     else:
         log_warning(f"VectorStore: Processed {successful}/{len(docs_batches)} batches")
 
@@ -164,13 +280,23 @@ async def main():
     """ Tavily Map and Extract Implementation: """
 
     log_info("Generating URL Map for the site")
-    site_map=tavily_map.invoke({"url":"https://docs.blender.org/manual/en/latest/",
-                                "limit":100})
-    log_success(f"Generated URL Map for {len(site_map)} URLs")
-    log_success(
-        f"TavilyMap: Successfully mapped {len(site_map['results'])} URLs")
+    #Apply instruction and regex filtering
+    site_map=tavily_map.invoke({"url": MAIN_URL,
+                                "limit":200,
+                                "instructions": "Map only actual Dark Souls story lore and character lore. Ignore Everything else",
+                                "exclude_paths": BAD_URLS})
 
-    url_batches = chunk_batches(list(site_map["results"]), batch_size=20)
+
+
+    urls = list(site_map.get("results", []))
+
+    log_success(f"Generated URL Map for {len(site_map.get('results'))} URLs")
+    log_info("Mapped URLs: ", Colors.YELLOW)
+    for u in urls:
+        print(u)
+
+
+    url_batches = chunk_batches(urls, batch_size=20)
 
     # Extract documents from URLs
     all_docs = await async_extract(url_batches)
@@ -186,16 +312,75 @@ async def main():
     log_success(
         f"Text Splitter:Created {len(docs_split)} chunks from {len(all_docs)} documents"
     )
+    """To optimize chunking and avoid rate limits: """
+    print("\n" + "=" * 60)
+    print("CHUNK DEBUG REPORT")
+    print("=" * 60)
+
+    # Per-document chunk counts
+    doc_chunk_stats = []
+
+    for doc in all_docs:
+        single_chunks = text_splitter.split_documents([doc])
+        content_len = len(doc.page_content)
+        approx_tokens = content_len / 4  # rough estimate
+        chunk_count = len(single_chunks)
+
+        doc_chunk_stats.append({
+            "url": doc.metadata.get("url", "unknown"),
+            "char_length": content_len,
+            "approx_tokens": int(approx_tokens),
+            "chunk_count": chunk_count,
+            "avg_chars_per_chunk": int(content_len / chunk_count) if chunk_count > 0 else 0,
+        })
+
+    # Sort by chunk_count descending
+    doc_chunk_stats.sort(key=lambda x: x["chunk_count"], reverse=True)
+
+    print(f"\nTotal documents: {len(all_docs)}")
+    print(f"Total chunks: {len(docs_split)}")
+    print(f"Average chunks per document: {len(docs_split)} / {len(all_docs):.2f}")
+
+    print("\nTop 10 documents producing the most chunks:\n")
+    for i, stat in enumerate(doc_chunk_stats[:10], start=1):
+        print(f"{i}. URL: {stat['url']}")
+        print(f"   Characters: {stat['char_length']}")
+        print(f"   Approx tokens: {stat['approx_tokens']}")
+        print(f"   Chunks: {stat['chunk_count']}")
+        print(f"   Avg chars/chunk: {stat['avg_chars_per_chunk']}")
+        print("-" * 60)
+
+    # #Also sort by raw character length
+    # largest_docs = sorted(doc_chunk_stats, key=lambda x: x["char_length"], reverse=True)
+    #
+    # print("\nTop 10 largest documents by raw character length:\n")
+    # for i, stat in enumerate(largest_docs[:10], start=1):
+    #     print(f"{i}. URL: {stat['url']}")
+    #     print(f"   Characters: {stat['char_length']}")
+    #     print(f"   Approx tokens: {stat['approx_tokens']}")
+    #     print(f"   Chunks: {stat['chunk_count']}")
+    #     print("-" * 60)
+    #
+    # # Show previews of worst offenders
+    # print("\nPreview of top 3 worst chunk offenders:\n")
+    # for stat in doc_chunk_stats[:3]:
+    #     matching_doc = next((d for d in all_docs if d.metadata.get("url") == stat["url"]), None)
+    #     if matching_doc:
+    #         print(f"URL: {stat['url']}")
+    #         print(f"Characters: {stat['char_length']}, Chunks: {stat['chunk_count']}")
+    #         preview = matching_doc.page_content[:2000]
+    #         print("Preview:")
+    #         print(preview)
+    #         print("\n" + "=" * 60 + "\n")
 
     #index coroutines for batch indexing
-    await batch_indexing(docs_split, batch_size=300)
+    await batch_indexing(docs_split, batch_size=25)
 
     #success log
     log_header("INGESTION PIPELINE COMPLETED")
     log_success("Documentation has been indexed to PineCone vector store")
-    log_info(f"No. of URLs scraped : {len(site_map)}")
-    log_info(f"No. of Documents indexed:{len(all_docs)} ")
-    log_info(f"No. of Chunks Created: {len(docs_split)}")
+    log_info(f"No. of URLs scraped : {len(urls)}")
+    log_info(f"No. of Documents indexed:{len(docs_split)} ")
 
 
 
