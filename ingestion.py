@@ -8,7 +8,6 @@ load_dotenv()
 from typing import Dict, List, Any
 #certifi verifies that the HTML request is certified and trusted
 import certifi
-
 from langchain_chroma import Chroma
 #chroma -> local vector store if not using PineCone
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
@@ -58,7 +57,7 @@ async def extract_batch(urls: List[str], batch_num : int) -> List[Dict[str, Any]
             Colors.BLUE,
         )
         #multiple batches can run concurrently
-        site_extract=await tavily_extract.ainvoke(input={"urls": urls, "extract_depth": "advanced"})
+        site_extract=await tavily_extract.ainvoke(input={"urls": urls, "extract_depth": "advanced"}) #async invoke
         extract_count=len(site_extract.get("results",[]))
         #some urls may not get extracted because theey may not have any content, blocked or timeout etc
 
@@ -104,6 +103,46 @@ async def async_extract(url_batches: List[List[str]]):
     return all_pages
 
 
+
+
+async def batch_indexing(documents : List[Document], batch_size: int = 50):
+
+    log_header("VECTOR INDEXING PHASE")
+    log_info(f"VectorIndexing: Starting concurrent indexing of {len(documents)} documents.", Colors.DARKCYAN)
+
+    #split into batches List[List[Doc]]
+    docs_batches=[documents[i : i+batch_size] for i in range(0, len(documents), batch_size)]
+
+    log_info(
+        f"VectorIndexing: Split into {len(docs_batches)} batches of {batch_size} documents each"
+    )
+
+    #another async routine to process each batch
+    async def add_batch(batch: List[Document], batch_num: int):
+        try:
+            await vector_store.aadd_documents(batch)  #async add
+            log_success(f"VectorStore: Successfully added batch {batch_num} with {len(batch)} documents to Vector Store")
+
+        except Exception as e:
+            log_error(f"VectorStore: Failed to add batch {batch_num} - {e}")
+            return False
+        return True
+
+    task=[add_batch(b,i+1) for i, b in enumerate(docs_batches)]
+    results=await asyncio.gather(*task, return_exceptions=True)
+
+    # Count successful batches
+    successful= sum([1 for i in results if i==True])
+
+    if successful==len(docs_batches):
+        log_success(f"VectorStore: Successfully index all {len(docs_batches)} batches.")
+    else:
+        log_warning(f"VectorStore: Processed {successful}/{len(docs_batches)} batches")
+
+
+
+
+
 async def main():
     """Main async function to execute the entire process"""
     log_header("DOCUMENT INGESTION PIPELINE")
@@ -136,11 +175,27 @@ async def main():
     # Extract documents from URLs
     all_docs = await async_extract(url_batches)
 
-    log_success("break")
+    #Chunk all_docs
+    log_header("DOCUMENT CHUNKING PHASE")
+    log_info(
+        f"Text Splitter: Processing {len(all_docs)} documents",
+        Colors.YELLOW,
+    )
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+    docs_split=text_splitter.split_documents(all_docs)
+    log_success(
+        f"Text Splitter:Created {len(docs_split)} chunks from {len(all_docs)} documents"
+    )
 
+    #index coroutines for batch indexing
+    await batch_indexing(docs_split, batch_size=300)
 
-
-
+    #success log
+    log_header("INGESTION PIPELINE COMPLETED")
+    log_success("Documentation has been indexed to PineCone vector store")
+    log_info(f"No. of URLs scraped : {len(site_map)}")
+    log_info(f"No. of Documents indexed:{len(all_docs)} ")
+    log_info(f"No. of Chunks Created: {len(docs_split)}")
 
 
 
