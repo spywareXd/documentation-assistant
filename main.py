@@ -1,6 +1,7 @@
 from typing import Any, Dict, List
 import streamlit as st
 from backend.core import run_llm
+from config import KNOWLEDGE_BASE_URL, KNOWLEDGE_BASE_SUBJECT
 
 
 def _format_sources(context_docs: List[Any]) -> List[str]:   #input list of documents (artifacts)
@@ -11,8 +12,8 @@ def _format_sources(context_docs: List[Any]) -> List[str]:   #input list of docu
     ]
 
 
-st.set_page_config(page_title="{} Documentation Helper", layout="centered")
-st.title("{} Documentation Helper")
+st.set_page_config(page_title=f"{KNOWLEDGE_BASE_SUBJECT} Documentation Helper", layout="centered")
+st.title(f"{KNOWLEDGE_BASE_SUBJECT} Helper")
 
 with st.sidebar:
     st.subheader("Session")
@@ -24,7 +25,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Ask me anything about {} docs. I’ll retrieve relevant context and cite sources.",
+            "content": f"Ask me anything about {KNOWLEDGE_BASE_SUBJECT}.",
             "sources": [],
         }
     ]
@@ -37,7 +38,7 @@ for msg in st.session_state.messages:
                 for s in msg["sources"]:
                     st.markdown(f"- {s}")
 
-prompt = st.chat_input(f"Ask a question about ")
+prompt = st.chat_input(f"Ask a question about {KNOWLEDGE_BASE_SUBJECT}")
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt, "sources": []})
     with st.chat_message("user"):
