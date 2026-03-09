@@ -55,9 +55,6 @@ GOOD_URLS = [
 ]
 
 
-
-
-
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
@@ -70,7 +67,7 @@ embeddings = GoogleGenerativeAIEmbeddings(
 )
 
 vector_store=PineconeVectorStore(index_name="document-assistant", embedding=embeddings)
-vector_store.delete(delete_all=True, namespace="__default__") #to reset VectorStore
+#vector_store.delete(delete_all=True, namespace="__default__") #to reset VectorStore
 tavily_extract = TavilyExtract()
 tavily_map = TavilyMap(max_depth=2, max_breadth=60, max_pages=1000)
 tavily_crawl = TavilyCrawl()
@@ -259,6 +256,12 @@ async def batch_indexing(documents : List[Document], batch_size: int = 50):
 
 
 
+
+
+
+
+
+
 async def main():
     """Main async function to execute the entire process"""
     log_header("DOCUMENT INGESTION PIPELINE")
@@ -350,28 +353,6 @@ async def main():
         print(f"   Avg chars/chunk: {stat['avg_chars_per_chunk']}")
         print("-" * 60)
 
-    # #Also sort by raw character length
-    # largest_docs = sorted(doc_chunk_stats, key=lambda x: x["char_length"], reverse=True)
-    #
-    # print("\nTop 10 largest documents by raw character length:\n")
-    # for i, stat in enumerate(largest_docs[:10], start=1):
-    #     print(f"{i}. URL: {stat['url']}")
-    #     print(f"   Characters: {stat['char_length']}")
-    #     print(f"   Approx tokens: {stat['approx_tokens']}")
-    #     print(f"   Chunks: {stat['chunk_count']}")
-    #     print("-" * 60)
-    #
-    # # Show previews of worst offenders
-    # print("\nPreview of top 3 worst chunk offenders:\n")
-    # for stat in doc_chunk_stats[:3]:
-    #     matching_doc = next((d for d in all_docs if d.metadata.get("url") == stat["url"]), None)
-    #     if matching_doc:
-    #         print(f"URL: {stat['url']}")
-    #         print(f"Characters: {stat['char_length']}, Chunks: {stat['chunk_count']}")
-    #         preview = matching_doc.page_content[:2000]
-    #         print("Preview:")
-    #         print(preview)
-    #         print("\n" + "=" * 60 + "\n")
 
     #index coroutines for batch indexing
     await batch_indexing(docs_split, batch_size=25)
