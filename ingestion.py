@@ -1,10 +1,9 @@
+from config import KNOWLEDGE_BASE_SUBJECT, KNOWLEDGE_BASE_URL, SCRAPING_INSTRUCTIONS
 import asyncio
 import re
 import ssl
 import os
 from dotenv import load_dotenv
-from sqlalchemy.testing.suite.test_reflection import metadata
-
 load_dotenv()
 from typing import Dict, List, Any
 #certifi verifies that the HTML request is certified and trusted
@@ -23,7 +22,7 @@ from logger import (Colors, log_error, log_header, log_info, log_success,
 
 
 semaphore = asyncio.Semaphore(2)  #to avoid rate limits
-MAIN_URL="https://darksouls.fandom.com/wiki/Lore"
+MAIN_URL=KNOWLEDGE_BASE_URL
 
 """URL Filtering"""
 BAD_URLS = [
@@ -50,10 +49,6 @@ BAD_URLS = [
     r"/Images",
 ]
 
-GOOD_URLS = [
-    "https://darksouls.fandom.com/wiki/"
-]
-
 
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -66,7 +61,7 @@ embeddings = GoogleGenerativeAIEmbeddings(
 
 )
 
-vector_store=PineconeVectorStore(index_name="document-assistant", embedding=embeddings)
+vector_store=PineconeVectorStore(index_name=os.environ["INDEX_NAME"], embedding=embeddings)
 #vector_store.delete(delete_all=True, namespace="__default__") #to reset VectorStore
 tavily_extract = TavilyExtract()
 tavily_map = TavilyMap(max_depth=2, max_breadth=60, max_pages=1000)
@@ -271,7 +266,7 @@ async def main():
     """Tavily Crawl Implementation: """
     # res = tavily_crawl.invoke(
     #     {
-    #         "url": "https://docs.blender.org/manual/en/latest/",
+    #         "url": "MAIN_URL",
     #         "max_depth": 2,
     #         "extract_depth": "advanced",
     #         "limit" : 35
@@ -286,7 +281,7 @@ async def main():
     #Apply instruction and regex filtering
     site_map=tavily_map.invoke({"url": MAIN_URL,
                                 "limit":200,
-                                "instructions": "Map only actual Dark Souls story lore and character lore. Ignore Everything else",
+                                "instructions": SCRAPING_INSTRUCTIONS,
                                 "exclude_paths": BAD_URLS})
 
 
