@@ -1,3 +1,4 @@
+from config import KNOWLEDGE_BASE_SUBJECT
 import os
 from dotenv import load_dotenv
 from langchain_pinecone import PineconeVectorStore
@@ -47,7 +48,7 @@ def run_llm(query: str):
 
     #defense prompting
     system_prompt=(
-                   "You are a helpful AI assistant that answers questions about {} documents"
+                   f"You are a helpful AI assistant that answers questions about {KNOWLEDGE_BASE_SUBJECT} documents"
                    "You have access to a tool that retrieves relevant documents to form context"
                    "Use the tool to find relevant information and context before answering the question"
                    "Always mention the sources you use in your answers"
@@ -67,9 +68,9 @@ def run_llm(query: str):
             if isinstance(message.artifact, list):
                 context.extend(message.artifact)
 
-    return {"answer": answer, "context": context}
+    return {"answer": answer[0]['text'], "context": context}
 
 
 if __name__ == "__main__":
-    result=run_llm(query="Who is Gravelord Nito")
+    result=run_llm(query="Hello")
     print(result)

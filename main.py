@@ -6,7 +6,7 @@ from config import KNOWLEDGE_BASE_URL, KNOWLEDGE_BASE_SUBJECT
 
 def _format_sources(context_docs: List[Any]) -> List[str]:   #input list of documents (artifacts)
     return [
-        str((meta.get("source") or "Unknown"))
+        str((meta.get("source") or meta.get("url") or "Unknown"))
         for doc in (context_docs or [])
         if (meta := (getattr(doc, "metadata", None) or {})) is not None
     ]
