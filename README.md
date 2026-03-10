@@ -1,6 +1,7 @@
 # Documentation Assistant
 
 A reusable **RAG-based documentation assistant** that can turn a website or wiki into a searchable chatbot.
+Simple demo on Dark Souls Lore Documentations: https://darksoulslore.streamlit.app/
 
 It works by:
 
@@ -96,4 +97,5 @@ BASE_URL = "URL_from_where_to_scrape_documentation"
 `uv run python ingestion.py`
 `uv run python ingestion.py`
 open `http://localhost:8501`
+
 
