@@ -1,0 +1,4 @@
+# Best retrieval, single-shot generation.
+extends: ../default.yaml
+name: e5_single
+pipeline: {mode: single}

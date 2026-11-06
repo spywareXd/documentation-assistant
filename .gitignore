@@ -214,3 +214,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# docrag local data (corpus snapshots, qdrant storage, LLM cache). results/ IS committed.
+data/
+

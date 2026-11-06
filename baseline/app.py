@@ -1,7 +1,8 @@
+# Original Streamlit UI (Dark Souls corpus, Pinecone). Run: streamlit run baseline/app.py
 from typing import Any, Dict, List
 import streamlit as st
-from backend.core import run_llm
-from config import KNOWLEDGE_BASE_URL, KNOWLEDGE_BASE_SUBJECT
+from baseline.core import run_llm
+from baseline.config import KNOWLEDGE_BASE_URL, KNOWLEDGE_BASE_SUBJECT
 
 
 def _format_sources(context_docs: List[Any]) -> List[str]:   #input list of documents (artifacts)

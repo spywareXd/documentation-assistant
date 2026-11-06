@@ -1,0 +1,4 @@
+# No query transformation.
+extends: ../default.yaml
+name: e4_none
+retrieval: {query_transform: none}

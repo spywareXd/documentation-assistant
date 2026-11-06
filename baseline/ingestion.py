@@ -1,4 +1,4 @@
-from config import KNOWLEDGE_BASE_SUBJECT, KNOWLEDGE_BASE_URL, SCRAPING_INSTRUCTIONS
+from baseline.config import KNOWLEDGE_BASE_SUBJECT, KNOWLEDGE_BASE_URL, SCRAPING_INSTRUCTIONS
 import asyncio
 import re
 import ssl
@@ -17,7 +17,8 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_tavily import TavilyCrawl, TavilyExtract, TavilyMap
 
-from logger import (Colors, log_error, log_header, log_info, log_success,
+# run as: python -m baseline.ingestion
+from docrag.logger import (Colors, log_error, log_header, log_info, log_success,
                     log_warning)
 
 
@@ -26,7 +27,7 @@ MAIN_URL=KNOWLEDGE_BASE_URL
 
 """URL Filtering"""
 BAD_URLS = [
-    "https://auth.fandom.com/"
+    "https://auth.fandom.com/",  # bug 4 fix: missing comma used to merge these two strings
     "auth.fandom.com/",
     "veaction=edit",
     "action=edit",

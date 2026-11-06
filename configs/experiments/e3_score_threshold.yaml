@@ -1,0 +1,6 @@
+# Keep chunks with reranker probability >= 0.3, k in [2, 10].
+extends: ../default.yaml
+name: e3_score_threshold
+retrieval:
+  dynamic_k: {policy: score_threshold, threshold: 0.3, min_k: 2, max_k: 10}
+pipeline: {mode: single}

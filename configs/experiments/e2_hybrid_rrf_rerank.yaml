@@ -1,0 +1,7 @@
+# Hybrid RRF + cross-encoder rerank (bge-reranker-v2-m3, top 50).
+extends: ../default.yaml
+name: e2_hybrid_rrf_rerank
+retrieval:
+  mode: hybrid
+  fusion: rrf
+  rerank: {enabled: true}

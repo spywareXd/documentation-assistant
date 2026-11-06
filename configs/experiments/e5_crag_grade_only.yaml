@@ -1,0 +1,4 @@
+# LangGraph: document grading + query-rewrite retries, no groundedness check.
+extends: ../default.yaml
+name: e5_crag_grade_only
+pipeline: {mode: graph, grade_documents: true, groundedness_check: false}

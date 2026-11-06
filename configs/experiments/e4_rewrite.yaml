@@ -1,0 +1,4 @@
+# LLM query rewrite.
+extends: ../default.yaml
+name: e4_rewrite
+retrieval: {query_transform: rewrite}

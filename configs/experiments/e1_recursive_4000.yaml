@@ -1,0 +1,4 @@
+# Recursive splitter at the original size.
+extends: ../default.yaml
+name: e1_recursive_4000
+chunking: {strategy: recursive, chunk_size: 4000, chunk_overlap: 200}

@@ -1,32 +1,57 @@
 [project]
 name = "documentation-assistant"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Hybrid + agentic RAG over multi-source technical docs, with a reproducible evaluation harness"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "beautifulsoup4>=4.14.3",
-    "black>=26.3.0",
+    # core / orchestration
+    "langchain>=1.0",
+    "langgraph>=1.0",
+    "langchain-groq>=1.0",
+    "langsmith>=0.7.14",
+    "pydantic>=2.10",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.2.2",
+    "tenacity>=9.0",
+    "tqdm>=4.67.3",
+    # retrieval
+    "qdrant-client>=1.15",
+    "fastembed>=0.7",
+    "sentence-transformers>=5.0",
+    "torch>=2.7",
+    "scikit-learn>=1.6",
+    "numpy>=2.0",
+    # ingestion
+    "langchain-text-splitters>=1.0",
+    "langchain-experimental>=0.4",
+    "langchain-tavily>=0.2.17",
     "certifi>=2026.2.25",
-    "fastapi>=0.135.1",
-    "firecrawl-py>=4.18.1",
-    "isort>=8.0.1",
-    "jinja2>=3.1.6",
-    "langchain-chroma>=1.1.0",
-    "langchain-community>=0.4.1",
+    # ui
+    "streamlit>=1.55.0",
+    # frozen baseline (E0 only)
     "langchain-google-genai>=4.2.1",
     "langchain-pinecone>=0.2.13",
-    "langchain-tavily>=0.2.17",
-    "langchainhub>=0.1.21",
-    "langsmith>=0.7.14",
-    "nltk>=3.9.3",
-    "openai>=2.26.0",
-    "pillow>=12.1.1",
-    "python-dotenv>=1.2.2",
-    "streamlit>=1.55.0",
-    "streamlit-chat>=0.1.1",
-    "tiktoken>=0.12.0",
-    "tqdm>=4.67.3",
-    "unstructured>=0.21.5",
-    "uvicorn>=0.41.0",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "black>=26.3.0", "isort>=8.0.1"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docrag"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]

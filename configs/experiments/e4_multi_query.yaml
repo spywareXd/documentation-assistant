@@ -1,0 +1,4 @@
+# 3 LLM reformulations + original, RRF-fused.
+extends: ../default.yaml
+name: e4_multi_query
+retrieval: {query_transform: multi_query, multi_query_n: 3}

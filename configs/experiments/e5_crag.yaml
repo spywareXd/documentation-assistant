@@ -1,0 +1,4 @@
+# LangGraph corrective RAG: grading + rewrite retries + groundedness check with one regeneration.
+extends: ../default.yaml
+name: e5_crag
+pipeline: {mode: graph, grade_documents: true, groundedness_check: true}

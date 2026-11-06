@@ -1,0 +1,11 @@
+# Original system: Gemini embeddings, recursive 4000/200, dense only, k ignored -> 4 (bug), single-shot.
+extends: ../default.yaml
+name: e0_original_k4
+embedding: {provider: gemini, model: gemini-embedding-001, output_dimensionality: 1536}
+chunking: {strategy: recursive, chunk_size: 4000, chunk_overlap: 200, min_chunk_chars: 1,
+  breadcrumb: false}
+retrieval:
+  mode: dense
+  top_k: 4
+  rerank: {enabled: false}
+pipeline: {mode: single}

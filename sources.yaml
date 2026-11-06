@@ -1,0 +1,67 @@
+# Corpus definition. Text is fetched locally into data/ (gitignored) and never redistributed.
+# Commits are resolved on first fetch and pinned in sources.lock.json (committed) for reproducibility.
+#
+# flavor     -> which cleaner to run (mkdocs | mintlify | hugo)
+# docs_path  -> folder inside the repo that holds the pages
+# extra_paths-> other folders the pages pull code from (snippets / includes)
+# include    -> glob patterns relative to docs_path (empty = everything)
+# exclude    -> glob patterns relative to docs_path
+# url        -> public URL; {path} = page path without extension, index pages collapse to the folder
+
+sources:
+  - name: fastapi
+    repo: fastapi/fastapi
+    branch: master
+    license: MIT
+    flavor: mkdocs
+    docs_path: docs/en/docs
+    extra_paths: [docs_src]
+    include: ["*.md", "tutorial/**/*.md", "advanced/**/*.md", "how-to/**/*.md", "deployment/**/*.md"]
+    exclude: ["release-notes.md", "fastapi-people.md", "external-links.md", "_llm-test.md",
+              "management*.md", "contributing.md", "help-fastapi.md", "newsletter.md", "translation-banner.md"]
+    url: "https://fastapi.tiangolo.com/{path}/"
+
+  - name: pydantic
+    repo: pydantic/pydantic
+    branch: main
+    license: MIT
+    flavor: mkdocs
+    docs_path: docs
+    extra_paths: []
+    include: ["*.md", "concepts/**/*.md", "errors/**/*.md", "examples/**/*.md", "integrations/**/*.md", "internals/**/*.md"]
+    exclude: ["pydantic_people.md", "contributing.md", "enterprise-support.md", "help_with_pydantic.md"]
+    url: "https://docs.pydantic.dev/latest/{path}/"
+
+  - name: qdrant
+    repo: qdrant/landing_page
+    branch: master
+    license: "unspecified (fetched for local indexing only, not redistributed)"
+    flavor: hugo
+    docs_path: qdrant-landing/content/documentation
+    extra_paths: [qdrant-landing/content/documentation/headless/snippets]
+    include: ["quickstart.md", "installation.md", "manage-data/**/*.md", "search/**/*.md",
+              "search-*/**/*.md", "overview/**/*.md", "fastembed/**/*.md", "send-data/**/*.md"]
+    exclude: ["**/_description.md"]
+    url: "https://qdrant.tech/documentation/{path}/"
+
+  - name: langchain
+    repo: langchain-ai/docs
+    branch: main
+    license: MIT
+    flavor: mintlify
+    docs_path: src/oss/langchain
+    extra_paths: [src/snippets]
+    include: []
+    exclude: ["changelog-*.mdx", "academy.mdx", "**/*-js.mdx"]
+    url: "https://docs.langchain.com/oss/python/langchain/{path}"
+
+  - name: langgraph
+    repo: langchain-ai/docs
+    branch: main
+    license: MIT
+    flavor: mintlify
+    docs_path: src/oss/langgraph
+    extra_paths: [src/snippets]
+    include: []
+    exclude: ["changelog-*.mdx", "**/*-js.mdx", "case-studies.mdx"]
+    url: "https://docs.langchain.com/oss/python/langgraph/{path}"

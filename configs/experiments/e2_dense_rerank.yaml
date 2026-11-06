@@ -1,0 +1,6 @@
+# Dense + cross-encoder rerank.
+extends: ../default.yaml
+name: e2_dense_rerank
+retrieval:
+  mode: dense
+  rerank: {enabled: true}

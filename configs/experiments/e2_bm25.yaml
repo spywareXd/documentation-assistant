@@ -1,0 +1,6 @@
+# BM25 only (Qdrant sparse + IDF).
+extends: ../default.yaml
+name: e2_bm25
+retrieval:
+  mode: sparse
+  rerank: {enabled: false}

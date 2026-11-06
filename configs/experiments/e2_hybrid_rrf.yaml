@@ -1,0 +1,7 @@
+# Hybrid, our RRF (k=60).
+extends: ../default.yaml
+name: e2_hybrid_rrf
+retrieval:
+  mode: hybrid
+  fusion: rrf
+  rerank: {enabled: false}

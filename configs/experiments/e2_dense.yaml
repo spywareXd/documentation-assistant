@@ -1,0 +1,6 @@
+# Dense only (bge-base).
+extends: ../default.yaml
+name: e2_dense
+retrieval:
+  mode: dense
+  rerank: {enabled: false}

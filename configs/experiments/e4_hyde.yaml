@@ -1,0 +1,4 @@
+# HyDE: dense search with a hypothetical answer passage.
+extends: ../default.yaml
+name: e4_hyde
+retrieval: {query_transform: hyde}

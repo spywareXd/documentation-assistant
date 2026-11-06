@@ -1,0 +1,6 @@
+# TF-IDF baseline.
+extends: ../default.yaml
+name: e2_tfidf
+retrieval:
+  mode: tfidf
+  rerank: {enabled: false}

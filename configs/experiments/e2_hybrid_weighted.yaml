@@ -1,0 +1,7 @@
+# Hybrid, min-max weighted score fusion (0.5/0.5).
+extends: ../default.yaml
+name: e2_hybrid_weighted
+retrieval:
+  mode: hybrid
+  fusion: weighted
+  rerank: {enabled: false}

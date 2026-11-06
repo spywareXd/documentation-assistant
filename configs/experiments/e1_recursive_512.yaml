@@ -1,0 +1,4 @@
+# Recursive splitter, 512 chars.
+extends: ../default.yaml
+name: e1_recursive_512
+chunking: {strategy: recursive, chunk_size: 512, chunk_overlap: 64}

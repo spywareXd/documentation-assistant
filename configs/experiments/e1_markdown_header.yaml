@@ -1,0 +1,4 @@
+# Heading-aware sections with breadcrumbs, 1000-char cap.
+extends: ../default.yaml
+name: e1_markdown_header
+chunking: {strategy: markdown_header, chunk_size: 1000}

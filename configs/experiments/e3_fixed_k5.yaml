@@ -1,0 +1,7 @@
+# Fixed k=5.
+extends: ../default.yaml
+name: e3_fixed_k5
+retrieval:
+  top_k: 5
+  dynamic_k: {policy: fixed}
+pipeline: {mode: single}

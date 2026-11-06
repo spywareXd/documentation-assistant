@@ -1,0 +1,4 @@
+# Heading-aware, 1500-char cap.
+extends: ../default.yaml
+name: e1_markdown_header_1500
+chunking: {strategy: markdown_header, chunk_size: 1500, chunk_overlap: 200}

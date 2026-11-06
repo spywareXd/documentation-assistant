@@ -1,0 +1,5 @@
+# Embedding-similarity breakpoints (95th percentile), 1000-char cap.
+extends: ../default.yaml
+name: e1_semantic
+chunking: {strategy: semantic, chunk_size: 1000, semantic_breakpoint: percentile,
+  semantic_threshold: 95}
