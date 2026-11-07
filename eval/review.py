@@ -9,6 +9,7 @@ Reject anything ambiguous, trivially lexical, wrong, or not answerable from the 
 from __future__ import annotations
 
 import argparse
+import re
 import json
 from collections import Counter
 from pathlib import Path
@@ -31,10 +32,27 @@ def _save(path: Path, rows: list[dict]) -> None:
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
 
 
+STOP = set("a an the of to in on for and or is are be how do does i my can what with from by it this that when which use using".split())
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z_][a-z0-9_]+", text.lower()) if w not in STOP}
+
+
+def lexical_overlap(question: str, quotes: list[str]) -> float:
+    """Share of the question's content words that also appear in the gold quote(s)."""
+    q = _words(question)
+    return len(q & _words(" ".join(quotes))) / len(q) if q else 0.0
+
+
 def _show(item: dict, docs_by_url: dict) -> None:
     print("\n" + "=" * 80)
     print(f"{BOLD}[{item['type']}] {item['source']}  id={item['id']}  split={item['split']}{END}")
     print(f"\n{BOLD}Q:{END} {item['question']}\n{BOLD}A:{END} {item['reference_answer']}")
+    if item["evidence"]:
+        ov = lexical_overlap(item["question"], [e["quote"] for e in item["evidence"]])
+        flag = f"{YEL}  <- mostly copied wording: reject or edit the question{END}" if ov >= 0.6 else ""
+        print(f"{DIM}word overlap with gold quote: {ov:.0%}{END}{flag}")
     for ev in item["evidence"]:
         doc = docs_by_url.get(ev["url"])
         print(f"\n{DIM}{ev['url']}{END}")

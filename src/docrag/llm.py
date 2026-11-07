@@ -1,11 +1,13 @@
-"""Groq (GPT-OSS) access with caching, rate limiting, retries and token accounting.
+"""Groq access with caching, rate limiting, retries and token accounting.
 
 Every call goes through `LLM.chat()`:
 - responses are cached in SQLite keyed by (model, messages, params), so re-running an
   experiment costs nothing and is deterministic;
-- a client-side limiter keeps us under Groq's requests-per-minute limit;
-- 429 / 5xx are retried with exponential backoff;
-- token usage is counted per role so eval runs can report cost per 1k queries.
+- a per-model limiter paces requests AND tokens per minute (Groq free tier: 30 RPM, 8k TPM);
+- short-term 429 / 5xx are retried with exponential backoff;
+- a spent daily quota (tokens/requests per day) raises QuotaExhausted immediately, so a run
+  stops cleanly and the next run resumes from the cache;
+- token usage is counted per role so eval runs can report tokens and cost per query.
 """
 from __future__ import annotations
 
@@ -31,19 +33,41 @@ Role = Literal["generator", "utility", "judge"]
 T = TypeVar("T", bound=BaseModel)
 
 
-class _Limiter:
-    def __init__(self, per_minute: int):
-        self.interval = 60.0 / max(per_minute, 1)
-        self.lock = threading.Lock()
-        self.next_at = 0.0
+class QuotaExhausted(RuntimeError):
+    """The model's daily token/request quota is used up. Re-run later; finished calls are cached."""
 
-    def wait(self) -> None:
+
+class _Limiter:
+    """Sliding 60 s window over requests and tokens for one model."""
+
+    def __init__(self, rpm: int, tpm: int):
+        self.rpm, self.tpm = rpm, tpm
+        self.events: list[tuple[float, int]] = []  # (time, tokens)
+        self.lock = threading.Lock()
+
+    def _trim(self, now: float) -> None:
+        self.events = [(t, n) for t, n in self.events if now - t < 60]
+
+    def wait(self, est_tokens: int) -> None:
+        est_tokens = min(est_tokens, int(self.tpm * 0.9))
+        while True:
+            with self.lock:
+                now = time.monotonic()
+                self._trim(now)
+                used = sum(n for _, n in self.events)
+                if len(self.events) < self.rpm and used + est_tokens <= self.tpm * 0.9:
+                    self.events.append((now, est_tokens))
+                    return
+                wait = 60 - (now - self.events[0][0]) + 0.1 if self.events else 1.0
+            time.sleep(max(wait, 0.5))
+
+    def correct(self, est_tokens: int, actual: int) -> None:
+        """Replace the estimate with the real usage once the response arrives."""
         with self.lock:
-            now = time.monotonic()
-            delay = self.next_at - now
-            self.next_at = max(now, self.next_at) + self.interval
-        if delay > 0:
-            time.sleep(delay)
+            for i in range(len(self.events) - 1, -1, -1):
+                if self.events[i][1] == est_tokens:
+                    self.events[i] = (self.events[i][0], actual)
+                    return
 
 
 class _Cache:
@@ -64,7 +88,14 @@ class _Cache:
             self.db.commit()
 
 
+def _is_daily_quota(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return "per day" in msg and ("tpd" in msg or "rpd" in msg or "rate limit" in msg)
+
+
 def _retryable(exc: BaseException) -> bool:
+    if isinstance(exc, QuotaExhausted):
+        return False
     status = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
     return status in (408, 409, 429, 500, 502, 503, 504) or "rate limit" in str(exc).lower()
 
@@ -78,7 +109,7 @@ class LLM:
         self.cfg = cfg.llm
         self.client = Groq(max_retries=0)  # retries are handled here, with backoff
         self.cache = _Cache(cfg.path(cfg.llm.cache_dir) / "groq.sqlite")
-        self.limiter = _Limiter(cfg.llm.requests_per_minute)
+        self.limiters: dict[str, _Limiter] = {}  # each Groq model has its own quota
         self.usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         self._usage_lock = threading.Lock()
 
@@ -125,15 +156,24 @@ class LLM:
             reraise=True,
         )
         def go():
-            self.limiter.wait()
+            model = params["model"]
+            limiter = self.limiters.setdefault(model, _Limiter(self.cfg.requests_per_minute, self.cfg.tokens_per_minute))
+            est = len(json.dumps(params["messages"])) // 3 + min(params["max_completion_tokens"], 800)
+            limiter.wait(est)
             t0 = time.perf_counter()
-            resp = self.client.chat.completions.create(**params)
+            try:
+                resp = self.client.chat.completions.create(**params)
+            except Exception as err:
+                if _is_daily_quota(err):
+                    raise QuotaExhausted(f"{model}: daily quota used up. {str(err)[:300]}") from err
+                raise
             u = resp.usage
             usage = {
                 "prompt_tokens": getattr(u, "prompt_tokens", 0) or 0,
                 "completion_tokens": getattr(u, "completion_tokens", 0) or 0,
                 "latency_s": round(time.perf_counter() - t0, 3),
             }
+            limiter.correct(est, usage["prompt_tokens"] + usage["completion_tokens"])
             return resp.choices[0].message.content or "", usage
 
         return go()
@@ -155,16 +195,30 @@ class LLM:
             + json.dumps(schema.model_json_schema()),
         }
         msgs = [sys_hint, *messages]
-        text = self.chat(msgs, role=role, json_mode=True, max_tokens=max_tokens)
+        try:
+            text = self.chat(msgs, role=role, json_mode=True, max_tokens=max_tokens)
+        except Exception as err:
+            if isinstance(err, QuotaExhausted) or "json_validate_failed" not in str(err):
+                raise
+            # Groq rejects non-JSON output in JSON mode; retry in plain mode and extract the object
+            strict = [*msgs, {"role": "user", "content": "Reply with the JSON object only: no prose, no code fences."}]
+            text = _extract_json(self.chat(strict, role=role, json_mode=False, max_tokens=max_tokens))
         try:
             return schema.model_validate_json(text)
         except ValidationError as err:
             repair = [*msgs, {"role": "assistant", "content": text},
                       {"role": "user", "content": f"That JSON was invalid: {err.errors()[:3]}. Return corrected JSON only."}]
-            return schema.model_validate_json(self.chat(repair, role=role, json_mode=True, max_tokens=max_tokens))
+            return schema.model_validate_json(
+                _extract_json(self.chat(repair, role=role, json_mode=False, max_tokens=max_tokens)))
 
     def usage_report(self) -> dict:
         return {role: dict(v) for role, v in self.usage.items()}
+
+
+def _extract_json(text: str) -> str:
+    """Outermost {...} in a reply that may carry prose or code fences around it."""
+    start, end = text.find("{"), text.rfind("}")
+    return text[start : end + 1] if 0 <= start < end else text
 
 
 _instance: LLM | None = None

@@ -220,7 +220,13 @@ def main() -> None:
     args = ap.parse_args()
     over = {"eval": {k: v for k, v in {"split": args.split, "limit": args.limit}.items() if v is not None}}
     cfg = load_config(args.config, **over)
-    run(cfg, retrieval_only=args.retrieval_only or cfg.eval.retrieval_only)
+    from docrag.llm import QuotaExhausted
+
+    try:
+        run(cfg, retrieval_only=args.retrieval_only or cfg.eval.retrieval_only)
+    except QuotaExhausted as err:
+        print(f"\nSTOPPED: {err}\nFinished LLM calls are cached; re-run the same command after the quota resets.")
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from docrag.llm import LLM
+from docrag.llm import LLM, QuotaExhausted
 
 DOMAIN = "Python developer documentation for FastAPI, Pydantic, Qdrant, LangChain and LangGraph"
 
@@ -46,7 +46,9 @@ def multi_query(llm: LLM, question: str, n: int = 3, history: list[dict] | None 
     )
     try:
         qs = llm.structured([{"role": "user", "content": msg}], _Queries, role="utility").queries
-    except Exception:
+    except Exception as _err:
+        if isinstance(_err, QuotaExhausted):
+            raise
         qs = []
     seen, out = set(), []
     for q in [question, *qs[:n]]:

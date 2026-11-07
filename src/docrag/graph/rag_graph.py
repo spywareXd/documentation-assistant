@@ -24,7 +24,7 @@ from langgraph.graph import END, START, StateGraph
 from docrag.config import Config
 from docrag.graph import prompts as P
 from docrag.index.qdrant_store import Hit
-from docrag.llm import get_llm
+from docrag.llm import get_llm, QuotaExhausted
 from docrag.retrieve.retriever import RetrievalResult, Retriever
 
 
@@ -75,6 +75,8 @@ class RAGPipeline:
             rel = self.llm.structured(P.grade_messages(state["question"], hits), P.Relevance, role="utility")
             keep = sorted({i for i in rel.relevant if 1 <= i <= len(hits)})
         except Exception as err:  # grading is an optimisation; on failure keep every chunk
+            if isinstance(err, QuotaExhausted):
+                raise
             return {"docs": hits, "trace": _log(state, "grade_documents", t0, error=str(err)[:200])}
         return {"docs": [hits[i - 1] for i in keep],
                 "trace": _log(state, "grade_documents", t0, kept=len(keep), of=len(hits))}
@@ -97,6 +99,8 @@ class RAGPipeline:
             try:
                 ans = self.llm.structured(msgs, P.Answer, role="generator", max_tokens=2048)
             except Exception as err:
+                if isinstance(err, QuotaExhausted):
+                    raise
                 ans = P.Answer(answerable=False, answer=f"Generation failed: {err}", citations=[])
             ans.citations = sorted({c for c in ans.citations if 1 <= c <= len(hits)})
         return {"answer": ans, "regenerations": state.get("regenerations", -1) + 1,
@@ -110,6 +114,8 @@ class RAGPipeline:
         try:
             g = self.llm.structured(P.groundedness_messages(ans.answer, state["docs"]), P.Groundedness, role="utility")
         except Exception as err:
+            if isinstance(err, QuotaExhausted):
+                raise
             return {"grounded": None, "trace": _log(state, "check_groundedness", t0, error=str(err)[:200])}
         feedback = None if g.grounded else "Unsupported claims: " + "; ".join(g.unsupported_claims[:5])
         return {"grounded": g.grounded, "feedback": feedback,

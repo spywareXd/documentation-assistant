@@ -85,14 +85,19 @@ class RetrievalCfg(BaseModel):
 
 
 class LLMCfg(BaseModel):
+    """Two models, one job each: the RAG system runs on one LLM; evaluation uses a judge
+    from a different model family (avoids self-preference bias). Both on Groq's free tier."""
+
     provider: Literal["groq"] = "groq"
-    generator: str = "openai/gpt-oss-120b"
-    utility: str = "openai/gpt-oss-20b"  # rewriting, grading, contextual summaries
-    judge: str = "openai/gpt-oss-120b"
+    generator: str = "openai/gpt-oss-120b"  # answers
+    utility: str = "openai/gpt-oss-120b"  # grading, groundedness, query rewrite (same model: one system LLM)
+    judge: str = "qwen/qwen3.8-27b"  # eval only
     temperature: float = 0.0
     reasoning_effort: Literal["low", "medium", "high"] = "low"
     cache_dir: str = "data/llm_cache"
+    # Groq free tier, per model: 30 RPM, 8k tokens/min, 200k tokens/day
     requests_per_minute: int = 25
+    tokens_per_minute: int = 8000
     max_retries: int = 6
 
 

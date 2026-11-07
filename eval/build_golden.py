@@ -25,7 +25,7 @@ from tqdm import tqdm
 from docrag.config import load_config
 from docrag.ingest.chunkers import Document
 from docrag.ingest.pipeline import build_documents
-from docrag.llm import get_llm
+from docrag.llm import get_llm, QuotaExhausted
 from eval.metrics import Evidence, locate
 
 OUT = Path(__file__).parent / "golden_draft.jsonl"
@@ -147,9 +147,11 @@ def main() -> None:
     ap.add_argument("--per-source", type=int, default=36, help="drafts per source before review")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--skip-unanswerable-check", action="store_true")
+    ap.add_argument("--sources", nargs="*", help="only draft these sources; appends to the existing draft file")
+    ap.add_argument("--drafter", help="model that writes drafts (default: config llm.generator)")
     args = ap.parse_args()
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, **({"llm": {"generator": args.drafter}} if args.drafter else {}))
     llm = get_llm(cfg)
     rng = random.Random(args.seed)
     docs = [d for d in build_documents(cfg) if len(d.text) > 800]
@@ -163,7 +165,15 @@ def main() -> None:
 
         retriever = Retriever(cfg)
 
-    items: list[dict] = []
+    # drafts are written per source, so a crash keeps finished sources; never overwrite reviewed work
+    done = {json.loads(l)["source"] for l in OUT.read_text(encoding="utf-8").splitlines() if l.strip()} if OUT.exists() else set()
+    if args.sources:
+        by_source = {k: v for k, v in by_source.items() if k in args.sources}
+    elif done:
+        raise SystemExit(f"{OUT} already has drafts for {sorted(done)}; use --sources to add more")
+    if done & set(by_source):
+        raise SystemExit(f"already drafted: {sorted(done & set(by_source))}")
+    total = 0
     for source, sdocs in by_source.items():
         n_single = round(args.per_source * 0.6)
         n_multi = round(args.per_source * 0.3)
@@ -177,26 +187,48 @@ def main() -> None:
                 try:
                     it = draft_single(llm, rng.choice(sdocs), rng) if want_single else draft_multi(llm, sdocs, rng)
                 except Exception as err:
+                    if isinstance(err, QuotaExhausted):
+                        raise
                     print(f"draft failed: {str(err)[:120]}")
                     continue
                 if it:
                     got.append(it)
                     bar.update(1)
-        unans = draft_unanswerable(llm, source, [d.title for d in sdocs], n_unans * 2)
-        if retriever:
-            unans = [u for u in unans if confirm_unanswerable(llm, retriever, u)]
-        got.extend(unans[:n_unans])
-        for it in got:
-            it["source"] = source
-        items.extend(got)
+        try:
+            unans = draft_unanswerable(llm, source, [d.title for d in sdocs], n_unans * 2)
+        except Exception as err:
+            if isinstance(err, QuotaExhausted):
+                raise
+            print(f"unanswerable drafting failed for {source}: {str(err)[:120]}")
+            unans = []
+        kept = []
+        for u in unans:
+            if len(kept) == n_unans:
+                break
+            if retriever is None:
+                kept.append(u)
+                continue
+            try:
+                if confirm_unanswerable(llm, retriever, u):
+                    kept.append(u)
+            except Exception as err:  # unclear -> keep it and let the human reviewer decide
+                if isinstance(err, QuotaExhausted):
+                    raise
+                print(f"unanswerable check failed, keeping for review: {str(err)[:100]}")
+                kept.append(u | {"check_failed": True})
+        got.extend(kept)
 
-    with OUT.open("w", encoding="utf-8") as f:
-        for it in items:
-            qid = hashlib.sha1(it["question"].encode()).hexdigest()[:10]
-            row = {"id": qid, "split": split_for(qid), "status": "pending", **it,
-                   "evidence": [{"url": e.url, "quote": e.quote} for e in it["evidence"]]}
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-    print(f"{len(items)} drafts -> {OUT}\nNext: python -m eval.review")
+        with OUT.open("a", encoding="utf-8") as f:
+            for it in got:
+                qid = hashlib.sha1(it["question"].encode()).hexdigest()[:10]
+                row = {"id": qid, "split": split_for(qid), "status": "pending", "source": source,
+                   "drafted_by": cfg.llm.generator, **it,
+                       "evidence": [{"url": e.url, "quote": e.quote} for e in it["evidence"]]}
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        total += len(got)
+        print(f"{source}: {len(got)} drafts saved")
+
+    print(f"{total} drafts -> {OUT}\nNext: python -m eval.review")
     print(json.dumps(get_llm(cfg).usage_report(), indent=2))
 
 
