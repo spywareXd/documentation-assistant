@@ -31,7 +31,10 @@ class SparseEncoder:
     def __init__(self, model: str):
         from fastembed import SparseTextEmbedding
 
-        self.model = SparseTextEmbedding(model_name=model)
+        from docrag.config import ROOT
+
+        # keep the model out of %TEMP% (gets cleaned) and avoid HF symlinks (need admin on Windows)
+        self.model = SparseTextEmbedding(model_name=model, cache_dir=str(ROOT / "data" / "models" / "fastembed"))
 
     def encode_docs(self, texts: list[str]) -> list[models.SparseVector]:
         return [models.SparseVector(indices=e.indices.tolist(), values=e.values.tolist())

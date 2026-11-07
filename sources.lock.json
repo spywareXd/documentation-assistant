@@ -1,0 +1,6 @@
+{
+  "fastapi/fastapi": "8e3db5153ec314d6e7775cd0ea39a46e95bfddb0",
+  "langchain-ai/docs": "89b6d1b8d9624ba99c3925d97535bac7648f794a",
+  "pydantic/pydantic": "b947584cc89eb0f4e57ba6efd0debdcccdcd3515",
+  "qdrant/landing_page": "84bc96c85c54074a27b98cba3be28b49faab4f16"
+}

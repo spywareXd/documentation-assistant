@@ -24,13 +24,12 @@ class Reranker:
     def rerank(self, query: str, hits: list[Hit]) -> list[Hit]:
         if not hits:
             return []
-        logits = self.model.predict(
+        # activation_fn=None -> the model's default head activation (sigmoid), i.e. probabilities in [0, 1]
+        probs = np.asarray(self.model.predict(
             [(query, h.chunk.embed_text()) for h in hits],
             batch_size=self.cfg.batch_size,
-            activation_fn=None,
             convert_to_numpy=True,
-        )
-        probs = 1.0 / (1.0 + np.exp(-np.asarray(logits, dtype=np.float64)))  # sigmoid -> [0, 1]
+        ), dtype=np.float64)
         order = np.argsort(-probs, kind="stable")
         return [Hit(hits[i].chunk, float(probs[i])) for i in order]
 

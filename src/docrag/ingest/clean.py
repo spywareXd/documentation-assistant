@@ -17,7 +17,7 @@ HTML_TAG = re.compile(r"</?[A-Za-z][A-Za-z0-9.-]*(?:\s[^<>]*)?/?>")
 MD_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 MD_LINK = re.compile(r"\[([^\]]+)\]\((?:[^()]|\([^)]*\))*\)")
 REF_LINK = re.compile(r"\[([^\]]+)\]\[[^\]]*\]")
-HEADING_ANCHOR = re.compile(r"(^#{1,6} .*?)\s*\{\s*#[^}]*\}\s*$", re.M)
+HEADING_ANCHOR = re.compile(r"(^#{1,6} .*?)[ \t]*\{[ \t]*#[^}\n]*\}[ \t]*$", re.M)
 ATTR_LIST = re.compile(r"\{\s*[.#][^}]*\}")
 
 
@@ -62,19 +62,24 @@ def _mkdocs_admonitions(text: str) -> str:
     while i < len(lines):
         line = lines[i]
         # FastAPI style:  /// tip | Title   ...   ///
-        m = re.match(r"^///\s*(\w+)?\s*(?:\|\s*(.*))?$", line.strip())
+        m = re.match(r"^/{3,}\s*([\w-]+)?\s*(?:\|\s*(.*))?$", line.strip())  # /// admonition, //// tab
         if m:
             kind, title = m.group(1), m.group(2)
-            if kind and kind not in ("details",):
+            if kind == "tab" and title:
+                out.append(f"**{title.strip()}:**")
+            elif kind and kind.startswith("version-"):  # "/// version-added | v2.10" is real content
+                out.append(f"*{kind.replace('-', ' ').capitalize()}: {(title or '').strip()}*")
+            elif kind and kind not in ("details",):
                 out.append(f"**{(title or kind).strip().capitalize()}:**")
             elif title:
                 out.append(f"**{title.strip()}**")
             i += 1
             continue
         # Material style:  !!! note "Title"  / ??? api "Title"  followed by an indented body
-        m = re.match(r'^(\s*)(!!!|\?\?\?\+?)\s*(\w+)(?:\s+"([^"]*)")?\s*$', line)
+        m = re.match(r"^(\s*)(!!!|\?\?\?\+?)\s*([\w-]+)(?:\s+(.+?))?\s*$", line)
         if m:
-            indent, kind, title = len(m.group(1)), m.group(3), m.group(4)
+            indent, kind = len(m.group(1)), m.group(3)
+            title = m.group(4)[1:-1] if m.group(4) and m.group(4)[0] == m.group(4)[-1] == '"' else m.group(4)
             body: list[str] = []
             i += 1
             while i < len(lines) and (not lines[i].strip() or len(lines[i]) - len(lines[i].lstrip()) > indent):
@@ -193,6 +198,13 @@ def _dedent_fences(text: str) -> str:
     return "\n".join(out)
 
 
+def _title_from_path(rel_path: str) -> str:
+    """concepts/json_schema.md -> "Json schema"; index pages use their folder name."""
+    parts = re.sub(r"\.(md|mdx)$", "", rel_path).split("/")
+    name = parts[-2] if parts[-1] in ("index", "_index") and len(parts) > 1 else parts[-1]
+    return re.sub(r"[_-]+", " ", name).strip().capitalize()
+
+
 CLEANERS = {"mkdocs": clean_mkdocs, "mintlify": clean_mintlify, "hugo": clean_hugo}
 
 
@@ -208,8 +220,9 @@ def clean_page(page: RawPage) -> tuple[str, str]:
 
     title = str(meta.get("title") or "").strip()
     if not title:
-        m = re.search(r"^#\s+(.+)$", body, re.M)
-        title = m.group(1).strip() if m else page.rel_path
+        prose = re.sub(r"```.*?```", "", body, flags=re.S)  # a "# comment" in code is not a title
+        m = re.search(r"^#\s+(.+)$", prose, re.M)
+        title = m.group(1).strip() if m else _title_from_path(page.rel_path)
     if not re.match(r"^#\s", body):  # make sure the page starts with its title as H1
         body = f"# {title}\n\n{body}"
     return title, body

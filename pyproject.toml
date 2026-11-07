@@ -9,6 +9,7 @@ dependencies = [
     "langchain>=1.0",
     "langgraph>=1.0",
     "langchain-groq>=1.0",
+    "groq>=0.30",
     "langsmith>=0.7.14",
     "pydantic>=2.10",
     "pyyaml>=6.0",
@@ -24,7 +25,6 @@ dependencies = [
     "numpy>=2.0",
     # ingestion
     "langchain-text-splitters>=1.0",
-    "langchain-experimental>=0.4",
     "langchain-tavily>=0.2.17",
     "certifi>=2026.2.25",
     # ui

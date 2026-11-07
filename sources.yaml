@@ -52,7 +52,7 @@ sources:
     docs_path: src/oss/langchain
     extra_paths: [src/snippets]
     include: []
-    exclude: ["changelog-*.mdx", "academy.mdx", "**/*-js.mdx"]
+    exclude: ["changelog-*.mdx", "academy.mdx", "**/*-js.mdx", "frontend/**"]
     url: "https://docs.langchain.com/oss/python/langchain/{path}"
 
   - name: langgraph
@@ -63,5 +63,5 @@ sources:
     docs_path: src/oss/langgraph
     extra_paths: [src/snippets]
     include: []
-    exclude: ["changelog-*.mdx", "**/*-js.mdx", "case-studies.mdx"]
+    exclude: ["changelog-*.mdx", "**/*-js.mdx", "case-studies.mdx", "frontend/**"]
     url: "https://docs.langchain.com/oss/python/langgraph/{path}"

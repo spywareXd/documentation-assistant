@@ -51,3 +51,9 @@ def test_hugo_shortcodes(tmp_path):
     files = {"qdrant-landing/content/documentation/snip/create/python.py": "client.create_collection()\n"}
     _, text = clean_page(_page(tmp_path, "qdrant-landing/content/documentation/c.md", md, "hugo", files))
     assert "```python\nclient.create_collection()\n```" in text and "{{" not in text
+
+
+def test_title_ignores_code_comments_and_falls_back_to_filename(tmp_path):
+    md = "Intro text.\n\n```python\n# ignore-above\nx = 1\n```\n"
+    title, text = clean_page(_page(tmp_path, "docs/concepts/json_schema.md", md, "mkdocs"))
+    assert title == "Json schema" and text.startswith("# Json schema")
