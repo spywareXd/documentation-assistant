@@ -30,7 +30,7 @@ from eval.metrics import Evidence, locate
 
 OUT = Path(__file__).parent / "golden_draft.jsonl"
 PASSAGE_CHARS = 1800
-TEST_SHARE = 0.2
+TEST_SHARE = 0.3  # raised from 0.2 before any tuning: 0.2 left too few reviewed test questions
 
 STYLE = (
     "Write the question the way a developer would type it into a docs search box or ask a colleague, "

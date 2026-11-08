@@ -1,4 +1,4 @@
-# Hybrid, Qdrant server-side RRF (parity check for our RRF).
+# Hybrid, Qdrant server-side RRF with the same constant as ours (k=60 one-based = Qdrant k=61): parity check.
 extends: ../default.yaml
 name: e2_hybrid_qdrant_rrf
 retrieval:

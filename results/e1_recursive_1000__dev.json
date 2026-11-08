@@ -1,0 +1,244 @@
+{
+  "name": "e1_recursive_1000",
+  "split": "dev",
+  "retrieval_only": true,
+  "config": {
+    "name": "e1_recursive_1000",
+    "corpus": {
+      "sources_file": "sources.yaml",
+      "data_dir": "data/corpus",
+      "sources": null
+    },
+    "chunking": {
+      "strategy": "recursive",
+      "chunk_size": 1000,
+      "chunk_overlap": 150,
+      "min_chunk_chars": 80,
+      "semantic_breakpoint": "percentile",
+      "semantic_threshold": 90.0,
+      "contextual": false,
+      "breadcrumb": true
+    },
+    "embedding": {
+      "provider": "sentence_transformers",
+      "model": "BAAI/bge-base-en-v1.5",
+      "output_dimensionality": null,
+      "batch_size": 64,
+      "device": "cuda",
+      "query_prefix": "Represent this sentence for searching relevant passages: ",
+      "max_seq_length": 512
+    },
+    "sparse": {
+      "model": "Qdrant/bm25"
+    },
+    "index": {
+      "url": null,
+      "collection_prefix": "docs"
+    },
+    "retrieval": {
+      "mode": "hybrid",
+      "fusion": "rrf",
+      "rrf_k": 60,
+      "dense_weight": 0.5,
+      "candidates": 50,
+      "top_k": 5,
+      "rerank": {
+        "enabled": true,
+        "model": "BAAI/bge-reranker-v2-m3",
+        "top_n": 50,
+        "batch_size": 16,
+        "max_length": 512
+      },
+      "dynamic_k": {
+        "policy": "fixed",
+        "threshold": 0.3,
+        "relative_drop": 0.5,
+        "min_k": 2,
+        "max_k": 10
+      },
+      "query_transform": "none",
+      "multi_query_n": 3
+    },
+    "llm": {
+      "provider": "groq",
+      "generator": "openai/gpt-oss-120b",
+      "utility": "openai/gpt-oss-20b",
+      "judge": "openai/gpt-oss-120b",
+      "temperature": 0.0,
+      "reasoning_effort": "low",
+      "cache_dir": "data/llm_cache",
+      "requests_per_minute": 25,
+      "tokens_per_minute": 8000,
+      "max_retries": 6
+    },
+    "pipeline": {
+      "mode": "graph",
+      "max_rewrites": 2,
+      "grade_documents": true,
+      "groundedness_check": true
+    },
+    "eval": {
+      "golden_set": "eval/golden_set.jsonl",
+      "split": "dev",
+      "ks": [
+        1,
+        3,
+        5,
+        10
+      ],
+      "retrieval_only": false,
+      "limit": null
+    }
+  },
+  "collection": "docs__84ed1d4922__bge-base-en-v1-5",
+  "environment": {
+    "date_utc": "2026-11-07T15:33:00+00:00",
+    "python": "3.11.9",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "git_commit": "35fb8f7",
+    "git_dirty": true,
+    "torch": "2.11.0+cu128",
+    "gpu": "NVIDIA GeForce RTX 3070 Ti Laptop GPU",
+    "sentence_transformers": "6.2.0",
+    "fastembed": "0.9.1",
+    "groq": "0.37.1",
+    "corpus_lock": {
+      "fastapi/fastapi": "8e3db5153ec314d6e7775cd0ea39a46e95bfddb0",
+      "langchain-ai/docs": "89b6d1b8d9624ba99c3925d97535bac7648f794a",
+      "pydantic/pydantic": "b947584cc89eb0f4e57ba6efd0debdcccdcd3515",
+      "qdrant/landing_page": "84bc96c85c54074a27b98cba3be28b49faab4f16"
+    },
+    "corpus": {
+      "documents": 317,
+      "chunks": 4260,
+      "documents_per_source": {
+        "fastapi": 120,
+        "pydantic": 51,
+        "qdrant": 52,
+        "langchain": 55,
+        "langgraph": 39
+      },
+      "chunk_chars": {
+        "mean": 846.8643192488263,
+        "p50": 908.0,
+        "p95": 991.0,
+        "max": 1000
+      }
+    }
+  },
+  "metrics": {
+    "n_questions": 85,
+    "n_answerable": 76,
+    "retrieval": {
+      "recall@1": 0.4998,
+      "recall@3": 0.7081,
+      "recall@5": 0.7728,
+      "recall@10": 0.8577,
+      "hit@1": 0.6053,
+      "hit@3": 0.8158,
+      "hit@5": 0.9079,
+      "hit@10": 0.9342,
+      "mrr": 0.7349,
+      "ndcg@10": 0.512,
+      "context_recall": 0.7728,
+      "context_precision": 0.2158,
+      "k_selected": 5.0
+    },
+    "retrieval_ci95": {
+      "recall@5": [
+        0.6952,
+        0.8428
+      ],
+      "mrr": [
+        0.6563,
+        0.8088
+      ],
+      "ndcg@10": [
+        0.4522,
+        0.5717
+      ]
+    },
+    "by_type": {
+      "multi": {
+        "recall@5": 0.4444,
+        "mrr": 0.4534
+      },
+      "single": {
+        "recall@5": 0.8169,
+        "mrr": 0.7727
+      }
+    },
+    "by_source": {
+      "fastapi": {
+        "recall@5": 0.7552,
+        "mrr": 0.7837
+      },
+      "langchain": {
+        "recall@5": 0.625,
+        "mrr": 0.6319
+      },
+      "langgraph": {
+        "recall@5": 0.6333,
+        "mrr": 0.4641
+      },
+      "pydantic": {
+        "recall@5": 0.8531,
+        "mrr": 0.8646
+      },
+      "qdrant": {
+        "recall@5": 0.8712,
+        "mrr": 0.7843
+      }
+    },
+    "latency_ms": {
+      "end_to_end": {
+        "p50": 653.4,
+        "p95": 850.4,
+        "p99": 985.4,
+        "mean": 673.7
+      },
+      "retrieval.query_transform": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "mean": 0.0
+      },
+      "retrieval.embed_query": {
+        "p50": 23.4,
+        "p95": 40.7,
+        "p99": 62.2,
+        "mean": 26.6
+      },
+      "retrieval.dense": {
+        "p50": 9.7,
+        "p95": 28.0,
+        "p99": 32.9,
+        "mean": 13.3
+      },
+      "retrieval.sparse": {
+        "p50": 11.4,
+        "p95": 29.7,
+        "p99": 31.6,
+        "mean": 15.1
+      },
+      "retrieval.fusion": {
+        "p50": 0.2,
+        "p95": 0.3,
+        "p99": 0.3,
+        "mean": 0.2
+      },
+      "retrieval.rerank": {
+        "p50": 600.8,
+        "p95": 797.7,
+        "p99": 907.4,
+        "mean": 618.3
+      },
+      "retrieval.total": {
+        "p50": 653.3,
+        "p95": 850.3,
+        "p99": 985.3,
+        "mean": 673.6
+      }
+    }
+  }
+}

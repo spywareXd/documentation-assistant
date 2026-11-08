@@ -1,9 +1,8 @@
-# Original system: Gemini embeddings, recursive 4000/200, dense only, k ignored -> 4 (bug), single-shot.
+# Original retrieval design with the same local embedder as the new system (isolates the pipeline changes):
+# recursive 4000/200 chunks, no breadcrumb, dense only, k ignored -> 4 (the original bug), single-shot.
 extends: ../default.yaml
 name: e0_original_k4
-embedding: {provider: gemini, model: gemini-embedding-001, output_dimensionality: 1536}
-chunking: {strategy: recursive, chunk_size: 4000, chunk_overlap: 200, min_chunk_chars: 1,
-  breadcrumb: false}
+chunking: {strategy: recursive, chunk_size: 4000, chunk_overlap: 200, min_chunk_chars: 1, breadcrumb: false}
 retrieval:
   mode: dense
   top_k: 4

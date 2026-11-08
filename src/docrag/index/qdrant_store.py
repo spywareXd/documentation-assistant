@@ -130,15 +130,20 @@ class QdrantStore:
                                        limit=limit, query_filter=flt, with_payload=True)
         return self._hits(res.points)
 
-    def search_hybrid_native(self, vec: np.ndarray, query: str, limit: int, candidates: int) -> list[Hit]:
-        """Server-side RRF (used to cross-check our own fusion implementation)."""
+    def search_hybrid_native(self, vec: np.ndarray, query: str, limit: int, candidates: int,
+                             rrf_k: int | None = None) -> list[Hit]:
+        """Server-side RRF (used to cross-check our own fusion implementation).
+
+        rrf_k uses OUR convention (1-based ranks, score 1/(k + rank)). Qdrant counts positions from 0,
+        so the same scores need Qdrant k = rrf_k + 1. None = Qdrant's default (k=2, i.e. our k=1)."""
         res = self.client.query_points(
             self.name,
             prefetch=[
                 models.Prefetch(query=vec.tolist(), using=DENSE, limit=candidates),
                 models.Prefetch(query=self.sparse.encode_query(query), using=SPARSE, limit=candidates),
             ],
-            query=models.FusionQuery(fusion=models.Fusion.RRF),
+            query=(models.FusionQuery(fusion=models.Fusion.RRF) if rrf_k is None
+                   else models.RrfQuery(rrf=models.Rrf(k=rrf_k + 1))),
             limit=limit,
             with_payload=True,
         )

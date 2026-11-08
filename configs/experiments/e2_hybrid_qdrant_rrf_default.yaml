@@ -1,0 +1,7 @@
+# Hybrid, Qdrant server-side RRF with Qdrant's default constant (k=2), vs the k=60 of the original RRF paper.
+extends: ../default.yaml
+name: e2_hybrid_qdrant_rrf_default
+retrieval:
+  mode: hybrid
+  fusion: qdrant_rrf_default
+  rerank: {enabled: false}

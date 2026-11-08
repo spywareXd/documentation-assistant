@@ -2,3 +2,5 @@
 extends: ../default.yaml
 name: e5_single
 pipeline: {mode: single}
+retrieval:
+  dynamic_k: {policy: relative_drop, relative_drop: 0.7, min_k: 2, max_k: 10}

@@ -73,7 +73,7 @@ class DynamicKCfg(BaseModel):
 
 class RetrievalCfg(BaseModel):
     mode: Literal["dense", "sparse", "tfidf", "hybrid"] = "hybrid"
-    fusion: Literal["rrf", "weighted", "qdrant_rrf"] = "rrf"
+    fusion: Literal["rrf", "weighted", "qdrant_rrf", "qdrant_rrf_default"] = "rrf"
     rrf_k: int = 60
     dense_weight: float = 0.5  # only for fusion=weighted
     candidates: int = 50  # per retriever, before fusion

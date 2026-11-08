@@ -1,6 +1,6 @@
-# Keep chunks scoring >= 50% of the best, k in [2, 10].
+# Keep chunks scoring >= 70% of the best, k in [2, 10]. (0.7 chosen on dev: eval/analysis.py dynk)
 extends: ../default.yaml
 name: e3_relative_drop
 retrieval:
-  dynamic_k: {policy: relative_drop, relative_drop: 0.5, min_k: 2, max_k: 10}
+  dynamic_k: {policy: relative_drop, relative_drop: 0.7, min_k: 2, max_k: 10}
 pipeline: {mode: single}

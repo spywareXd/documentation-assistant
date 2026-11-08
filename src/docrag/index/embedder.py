@@ -66,19 +66,82 @@ class GeminiEmbedder(Embedder):
             model=cfg.model, task_type="RETRIEVAL_DOCUMENT", output_dimensionality=cfg.output_dimensionality
         )
 
+    # Free tier: 30k embedding tokens per minute. Stay under it with small, paced batches.
+    TOKENS_PER_MIN = 25_000
+    BATCH_TOKENS = 6_000
+
+    def _cache(self):
+        if not hasattr(self, "_db"):
+            import sqlite3
+
+            from docrag.config import ROOT
+
+            path = ROOT / "data" / "emb_cache" / f"{self.cfg.model}-{self.dim}.sqlite"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._db = sqlite3.connect(path)
+            self._db.execute("CREATE TABLE IF NOT EXISTS emb (key TEXT PRIMARY KEY, vec BLOB)")
+        return self._db
+
+    @staticmethod
+    def _key(text: str) -> str:
+        import hashlib
+
+        return hashlib.sha1(text.encode()).hexdigest()
+
     def embed_documents(self, texts: Sequence[str], show_progress: bool = False) -> np.ndarray:
-        out, batch = [], 50
-        for i in tqdm(range(0, len(texts), batch), disable=not show_progress, desc="gemini embed"):
-            for attempt in range(6):
-                try:
-                    out.extend(self.client.embed_documents(list(texts[i : i + batch])))
+        """Cached per text, so a run cut off by the free tier's daily request limit resumes next day."""
+        from docrag.llm import QuotaExhausted
+
+        db = self._cache()
+        keys = [self._key(t) for t in texts]
+        have = {}
+        for i in range(0, len(keys), 500):
+            chunk = keys[i : i + 500]
+            q = f"SELECT key, vec FROM emb WHERE key IN ({','.join('?' * len(chunk))})"
+            have.update({k: np.frombuffer(v, dtype=np.float32) for k, v in db.execute(q, chunk)})
+        todo = [(k, t) for k, t in dict(zip(keys, texts)).items() if k not in have]
+        if todo:
+            print(f"gemini: {len(have)} cached, embedding {len(todo)}")
+
+        # token-bounded batches (~4 chars per token)
+        batches, cur, cur_tok = [], [], 0
+        for k, t in todo:
+            tok = len(t) // 4 + 1
+            if cur and cur_tok + tok > self.BATCH_TOKENS:
+                batches.append(cur)
+                cur, cur_tok = [], 0
+            cur.append((k, t))
+            cur_tok += tok
+        if cur:
+            batches.append(cur)
+
+        window = []  # (time, tokens) sent in the last 60 s
+        for batch in tqdm(batches, disable=not show_progress, desc="gemini embed"):
+            tok = sum(len(t) // 4 + 1 for _, t in batch)
+            while True:
+                now = time.monotonic()
+                window = [(t0, n) for t0, n in window if now - t0 < 60]
+                if sum(n for _, n in window) + tok <= self.TOKENS_PER_MIN:
                     break
-                except Exception as err:  # free-tier rate limits
-                    if attempt == 5:
+                time.sleep(60 - (now - window[0][0]) + 0.5)
+            for attempt in range(8):
+                try:
+                    vecs = self.client.embed_documents([t for _, t in batch])
+                    window.append((time.monotonic(), tok))
+                    break
+                except Exception as err:
+                    msg = str(err)
+                    if "free_tier_requests" in msg or "per day" in msg.lower():
+                        raise QuotaExhausted(f"gemini embeddings: daily request limit reached ({len(have)} cached)") from err
+                    if attempt == 7:
                         raise
-                    time.sleep(2 ** attempt * 5)
-                    print(f"gemini retry {attempt + 1}: {str(err)[:120]}")
-        return _normalize(np.array(out, dtype=np.float32))
+                    print(f"gemini retry {attempt + 1} in 35s: {msg[:100]}")
+                    time.sleep(35)
+            rows = [(k, np.asarray(v, dtype=np.float32).tobytes()) for (k, _), v in zip(batch, vecs)]
+            db.executemany("INSERT OR REPLACE INTO emb VALUES (?, ?)", rows)
+            db.commit()
+            have.update({k: np.frombuffer(b, dtype=np.float32) for k, b in rows})
+        return _normalize(np.stack([have[k] for k in keys]))
 
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         return self.embed_documents(texts)  # original system embedded queries the same way

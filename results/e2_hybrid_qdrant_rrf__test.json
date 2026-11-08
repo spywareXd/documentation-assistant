@@ -1,9 +1,9 @@
 {
-  "name": "prelim_e2_hybrid_rrf_rerank",
-  "split": "all",
+  "name": "e2_hybrid_qdrant_rrf",
+  "split": "test",
   "retrieval_only": true,
   "config": {
-    "name": "prelim_e2_hybrid_rrf_rerank",
+    "name": "e2_hybrid_qdrant_rrf",
     "corpus": {
       "sources_file": "sources.yaml",
       "data_dir": "data/corpus",
@@ -37,13 +37,13 @@
     },
     "retrieval": {
       "mode": "hybrid",
-      "fusion": "rrf",
+      "fusion": "qdrant_rrf",
       "rrf_k": 60,
       "dense_weight": 0.5,
       "candidates": 50,
       "top_k": 5,
       "rerank": {
-        "enabled": true,
+        "enabled": false,
         "model": "BAAI/bge-reranker-v2-m3",
         "top_n": 50,
         "batch_size": 16,
@@ -78,8 +78,8 @@
       "groundedness_check": true
     },
     "eval": {
-      "golden_set": "eval/golden_draft.jsonl",
-      "split": "all",
+      "golden_set": "eval/golden_set.jsonl",
+      "split": "test",
       "ks": [
         1,
         3,
@@ -92,10 +92,10 @@
   },
   "collection": "docs__925aff0f4d__bge-base-en-v1-5",
   "environment": {
-    "date_utc": "2026-11-07T15:00:33+00:00",
+    "date_utc": "2026-11-07T16:33:13+00:00",
     "python": "3.11.9",
     "platform": "Windows-10-10.0.26200-SP0",
-    "git_commit": "a63abc0",
+    "git_commit": "35fb8f7",
     "git_dirty": true,
     "torch": "2.11.0+cu128",
     "gpu": "NVIDIA GeForce RTX 3070 Ti Laptop GPU",
@@ -127,67 +127,75 @@
     }
   },
   "metrics": {
-    "n_questions": 108,
-    "n_answerable": 99,
+    "n_questions": 24,
+    "n_answerable": 21,
     "retrieval": {
-      "recall@1": 0.4737,
-      "recall@3": 0.6892,
-      "recall@5": 0.7487,
-      "recall@10": 0.8565,
-      "hit@1": 0.6263,
-      "hit@3": 0.8485,
-      "hit@5": 0.8889,
-      "hit@10": 0.9495,
-      "mrr": 0.7398,
-      "ndcg@10": 0.563,
-      "context_recall": 0.7487,
-      "context_precision": 0.2283,
+      "recall@1": 0.4728,
+      "recall@3": 0.7259,
+      "recall@5": 0.8075,
+      "recall@10": 0.8075,
+      "hit@1": 0.5714,
+      "hit@3": 0.8571,
+      "hit@5": 0.8571,
+      "hit@10": 0.8571,
+      "mrr": 0.7098,
+      "ndcg@10": 0.5704,
+      "context_recall": 0.8075,
+      "context_precision": 0.2381,
       "k_selected": 5.0
     },
     "retrieval_ci95": {
       "recall@5": [
-        0.6763,
-        0.8173
+        0.6286,
+        0.9524
       ],
       "mrr": [
-        0.6689,
-        0.8051
+        0.542,
+        0.8571
       ],
       "ndcg@10": [
-        0.5056,
-        0.6187
+        0.4288,
+        0.6995
       ]
     },
     "by_type": {
       "multi": {
-        "recall@5": 0.6364,
-        "mrr": 0.6673
+        "recall@5": 1.0,
+        "mrr": 0.75
       },
       "single": {
-        "recall@5": 0.8049,
-        "mrr": 0.7761
+        "recall@5": 0.7872,
+        "mrr": 0.7055
       }
     },
     "by_source": {
       "fastapi": {
-        "recall@5": 0.6237,
-        "mrr": 0.7618
+        "recall@5": 1.0,
+        "mrr": 1.0
+      },
+      "langchain": {
+        "recall@5": 1.0,
+        "mrr": 0.6111
+      },
+      "langgraph": {
+        "recall@5": 0.7143,
+        "mrr": 0.6531
       },
       "pydantic": {
-        "recall@5": 0.7775,
-        "mrr": 0.7163
+        "recall@5": 0.619,
+        "mrr": 0.5
       },
       "qdrant": {
-        "recall@5": 0.845,
-        "mrr": 0.7414
+        "recall@5": 0.82,
+        "mrr": 0.8
       }
     },
     "latency_ms": {
       "end_to_end": {
-        "p50": 573.1,
-        "p95": 703.4,
-        "p99": 769.4,
-        "mean": 573.2
+        "p50": 29.1,
+        "p95": 41.7,
+        "p99": 43.0,
+        "mean": 28.0
       },
       "retrieval.query_transform": {
         "p50": 0.0,
@@ -196,40 +204,22 @@
         "mean": 0.0
       },
       "retrieval.embed_query": {
-        "p50": 26.5,
-        "p95": 38.4,
-        "p99": 44.8,
-        "mean": 26.9
+        "p50": 12.3,
+        "p95": 14.2,
+        "p99": 14.7,
+        "mean": 12.5
       },
-      "retrieval.dense": {
-        "p50": 10.0,
-        "p95": 29.3,
-        "p99": 31.9,
-        "mean": 14.3
-      },
-      "retrieval.sparse": {
-        "p50": 10.4,
-        "p95": 30.4,
-        "p99": 31.1,
-        "mean": 15.1
-      },
-      "retrieval.fusion": {
-        "p50": 0.1,
-        "p95": 0.4,
-        "p99": 1.0,
-        "mean": 0.2
-      },
-      "retrieval.rerank": {
-        "p50": 513.3,
-        "p95": 630.7,
-        "p99": 697.1,
-        "mean": 516.4
+      "retrieval.hybrid_native": {
+        "p50": 17.5,
+        "p95": 28.5,
+        "p99": 29.6,
+        "mean": 15.4
       },
       "retrieval.total": {
-        "p50": 573.0,
-        "p95": 703.3,
-        "p99": 769.3,
-        "mean": 573.1
+        "p50": 29.1,
+        "p95": 41.7,
+        "p99": 43.0,
+        "mean": 27.9
       }
     }
   }

@@ -108,9 +108,10 @@ class Retriever:
             with timer("embed_query"):
                 vec = (self.embedder.embed_documents([dense_text])[0] if dense_text
                        else self.embedder.embed_query(q))
-            if mode == "hybrid" and self.rcfg.fusion == "qdrant_rrf":
+            if mode == "hybrid" and self.rcfg.fusion in ("qdrant_rrf", "qdrant_rrf_default"):
+                k = None if self.rcfg.fusion == "qdrant_rrf_default" else self.rcfg.rrf_k
                 with timer("hybrid_native"):
-                    return self.store.search_hybrid_native(vec, q, limit=n, candidates=n)
+                    return self.store.search_hybrid_native(vec, q, limit=n, candidates=n, rrf_k=k)
             with timer("dense"):
                 dense_hits = self.store.search_dense(vec, n)
         if mode in ("sparse", "hybrid"):

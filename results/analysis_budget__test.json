@@ -1,0 +1,38 @@
+{
+  "e1_recursive_512": {
+    "recall@500tok": 0.5714,
+    "recall@1000tok": 0.7007,
+    "recall@1500tok": 0.7007,
+    "recall@2500tok": 0.7007
+  },
+  "e1_recursive_1000": {
+    "recall@500tok": 0.4741,
+    "recall@1000tok": 0.6941,
+    "recall@1500tok": 0.7757,
+    "recall@2500tok": 0.7757
+  },
+  "e1_recursive_4000": {
+    "recall@500tok": 0.39,
+    "recall@1000tok": 0.39,
+    "recall@1500tok": 0.4376,
+    "recall@2500tok": 0.5249
+  },
+  "e1_markdown_header": {
+    "recall@500tok": 0.6,
+    "recall@1000tok": 0.7995,
+    "recall@1500tok": 0.8392,
+    "recall@2500tok": 0.8392
+  },
+  "e1_markdown_header_1500": {
+    "recall@500tok": 0.5238,
+    "recall@1000tok": 0.7361,
+    "recall@1500tok": 0.7995,
+    "recall@2500tok": 0.8154
+  },
+  "e1_semantic": {
+    "recall@500tok": 0.583,
+    "recall@1000tok": 0.7122,
+    "recall@1500tok": 0.7122,
+    "recall@2500tok": 0.7678
+  }
+}
